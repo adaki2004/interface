@@ -31,7 +31,7 @@ export type TokenAddressMap = Readonly<{ [chainId in ChainId]: Readonly<{ [token
 const GWYNETH_TOKENS: TokenInfo[] = [
   {
     chainId: ChainId.GWYNETH,
-    address: '0x84FB3688D1ee5dCD0137746A07290f8bE55ec04E',
+    address: '0x6B2345898C657861F13C6408b73c82bb39784ec2',
     name: 'Cheese Token',
     decimals: 18,
     symbol: 'CHEESE',
