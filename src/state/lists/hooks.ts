@@ -27,6 +27,52 @@ export class WrappedTokenInfo extends Token {
 
 export type TokenAddressMap = Readonly<{ [chainId in ChainId]: Readonly<{ [tokenAddress: string]: WrappedTokenInfo }> }>
 
+// Define the GWYNETH tokens
+const GWYNETH_TOKENS: TokenInfo[] = [
+  {
+    chainId: ChainId.GWYNETH,
+    address: '0x84FB3688D1ee5dCD0137746A07290f8bE55ec04E',
+    name: 'Cheese Token',
+    decimals: 18,
+    symbol: 'CHEESE',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['cheese']
+  },
+  {
+    chainId: ChainId.GWYNETH,
+    address: '0x0a01EF051EfEeEEBE01A333F7323547494f30817',
+    name: 'Wrapped Ether',
+    decimals: 18,
+    symbol: 'WETH',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['wrapped', 'weth']
+  }
+]
+
+// Define the GWYNETH tokens
+const SEPOLIA_TOKENS: TokenInfo[] = [
+  {
+    chainId: ChainId.SEPOLIA,
+    address: '0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9',
+    name: 'Wrapped Ether',
+    decimals: 18,
+    symbol: 'WETH',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['wrapped', 'weth']
+  }
+]
+
+// Convert TokenInfo array to TokenAddressMap format
+const GWYNETH_TOKEN_MAP = GWYNETH_TOKENS.reduce<{ [tokenAddress: string]: WrappedTokenInfo }>((acc, tokenInfo) => {
+  acc[tokenInfo.address] = new WrappedTokenInfo(tokenInfo, [])
+  return acc
+}, {})
+
+const SEPOLIA_TOKEN_MAP = SEPOLIA_TOKENS.reduce<{ [tokenAddress: string]: WrappedTokenInfo }>((acc, tokenInfo) => {
+  acc[tokenInfo.address] = new WrappedTokenInfo(tokenInfo, [])
+  return acc
+}, {})
+
 /**
  * An empty result, useful as a default.
  */
@@ -35,7 +81,9 @@ const EMPTY_LIST: TokenAddressMap = {
   [ChainId.RINKEBY]: {},
   [ChainId.ROPSTEN]: {},
   [ChainId.GÖRLI]: {},
-  [ChainId.MAINNET]: {}
+  [ChainId.MAINNET]: {},
+  [ChainId.GWYNETH]: GWYNETH_TOKEN_MAP,
+  [ChainId.SEPOLIA]: SEPOLIA_TOKEN_MAP
 }
 
 const listCache: WeakMap<TokenList, TokenAddressMap> | null =
