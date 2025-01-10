@@ -30,6 +30,24 @@ export type TokenAddressMap = Readonly<{ [chainId in ChainId]: Readonly<{ [token
 // Define the GWYNETH tokens
 const GWYNETH_TOKENS: TokenInfo[] = [
   {
+  chainId: ChainId.GWYNETH,
+  address: '0xA12297e9F5B9E9Ca7A810725904aFAf13a1eD568',
+  name: 'Sloth Token',
+  decimals: 18,
+  symbol: 'SLOTH',
+  logoURI: undefined, // Add logo URI if available
+  tags: ['sloth']
+},
+  {
+    chainId: ChainId.GWYNETH,
+    address: '0x534Cf76B8D56ab71caC1c211c9B38C81cA8E4B45',
+    name: 'Taiko Token',
+    decimals: 18,
+    symbol: 'TAIKO',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['taiko']
+  },
+  {
     chainId: ChainId.GWYNETH,
     address: '0x6B2345898C657861F13C6408b73c82bb39784ec2',
     name: 'Cheese Token',
@@ -83,6 +101,8 @@ const EMPTY_LIST: TokenAddressMap = {
   [ChainId.GÖRLI]: {},
   [ChainId.MAINNET]: {},
   [ChainId.GWYNETH]: GWYNETH_TOKEN_MAP,
+  [ChainId.GWYNETH_L2A]: {},
+  [ChainId.GWYNETH_L2B]: {},
   [ChainId.SEPOLIA]: SEPOLIA_TOKEN_MAP
 }
 

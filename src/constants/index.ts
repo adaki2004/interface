@@ -24,6 +24,8 @@ const WETH_ONLY: ChainTokenList = {
   [ChainId.GÖRLI]: [WETH[ChainId.GÖRLI]],
   [ChainId.KOVAN]: [WETH[ChainId.KOVAN]],
   [ChainId.GWYNETH]: [WETH[ChainId.GWYNETH]],
+  [ChainId.GWYNETH_L2A]: [WETH[ChainId.GWYNETH_L2A]],
+  [ChainId.GWYNETH_L2B]: [WETH[ChainId.GWYNETH_L2B]],
   [ChainId.SEPOLIA]: [WETH[ChainId.SEPOLIA]]
 }
 
