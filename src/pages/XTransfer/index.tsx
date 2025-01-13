@@ -99,7 +99,7 @@ type ChainOption = {
   name: string
 }
 
-// Update these chain IDs according to your network
+// Set proper chain ids
 const CHAIN_OPTIONS: ChainOption[] = [
   { id: 160010, name: 'Gwyneth L1' },    // L1 chain ID
   { id: 167010, name: 'Gwyneth L2A' },   // L2A chain ID
