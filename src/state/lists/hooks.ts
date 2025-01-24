@@ -101,8 +101,8 @@ const EMPTY_LIST: TokenAddressMap = {
   [ChainId.GÖRLI]: {},
   [ChainId.MAINNET]: {},
   [ChainId.GWYNETH]: GWYNETH_TOKEN_MAP,
-  [ChainId.GWYNETH_L2A]: {},
-  [ChainId.GWYNETH_L2B]: {},
+  [ChainId.GWYNETH_L2A]: GWYNETH_TOKEN_MAP,
+  [ChainId.GWYNETH_L2B]: GWYNETH_TOKEN_MAP,
   [ChainId.SEPOLIA]: SEPOLIA_TOKEN_MAP
 }
 

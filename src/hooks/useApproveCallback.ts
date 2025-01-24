@@ -1,6 +1,6 @@
 import { MaxUint256 } from '@ethersproject/constants'
 import { TransactionResponse } from '@ethersproject/providers'
-import { Trade, TokenAmount, CurrencyAmount, ETHER } from '@uniswap/sdk'
+import { Trade, TokenAmount, CurrencyAmount, ETHER, currencyEquals } from '@uniswap/sdk'
 import { useCallback, useMemo } from 'react'
 import { ROUTER_ADDRESS } from '../constants'
 import { useTokenAllowance } from '../data/Allowances'
@@ -19,6 +19,25 @@ export enum ApprovalState {
   PENDING,
   APPROVED
 }
+
+// First add the constants at the top
+const UNISWAP_PORTAL_ADDRESS = '0x84FB3688D1ee5dCD0137746A07290f8bE55ec04E'
+const L2_CHAIN_IDS = {
+  L2A: 167010,
+  L2B: 167011
+}
+
+// Add helper functions
+const isL2Chain = (chainId?: number): boolean => {
+  return chainId === L2_CHAIN_IDS.L2A || chainId === L2_CHAIN_IDS.L2B
+}
+
+const isTokenToTokenSwap = (trade: Trade | undefined): boolean => {
+  if (!trade) return false
+  return !currencyEquals(trade.inputAmount.currency, ETHER) && 
+         !currencyEquals(trade.outputAmount.currency, ETHER)
+}
+
 
 // returns a variable indicating the state of the approval and a function which approves if necessary or early returns
 export function useApproveCallback(
@@ -99,13 +118,27 @@ export function useApproveCallback(
   return [approvalState, approve]
 }
 
-// wraps useApproveCallback in the context of a swap
 export function useApproveCallbackFromTrade(trade?: Trade, allowedSlippage = 0) {
+  const { chainId } = useActiveWeb3React()
+  const v1TradeExchangeAddress = useV1TradeExchangeAddress(trade) // Move this outside
+  
   const amountToApprove = useMemo(
     () => (trade ? computeSlippageAdjustedAmounts(trade, allowedSlippage)[Field.INPUT] : undefined),
     [trade, allowedSlippage]
   )
-  const tradeIsV1 = getTradeVersion(trade) === Version.v1
-  const v1ExchangeAddress = useV1TradeExchangeAddress(trade)
-  return useApproveCallback(amountToApprove, tradeIsV1 ? v1ExchangeAddress : ROUTER_ADDRESS)
+
+  const spenderAddress = useMemo(() => {
+    if (!trade) return undefined
+    
+    // Use Portal contract for token-token swaps on L2
+    if (isL2Chain(chainId) && isTokenToTokenSwap(trade)) {
+      return UNISWAP_PORTAL_ADDRESS
+    }
+    
+    // Otherwise use original logic
+    const tradeIsV1 = getTradeVersion(trade) === Version.v1
+    return tradeIsV1 ? v1TradeExchangeAddress : ROUTER_ADDRESS // Use the hook result here
+  }, [trade, chainId, v1TradeExchangeAddress]) // Add to dependencies
+
+  return useApproveCallback(amountToApprove, spenderAddress)
 }
