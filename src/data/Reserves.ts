@@ -51,6 +51,10 @@ export function usePairs(currencies: [Currency | undefined, Currency | undefined
     [tokens, chainId]
   )
 
+  // Dani/Brecht todos:
+  // 1.: This needs to get info from L1 !! Instead of L2, so that we dont need to deploy liquidity on L2 -> If complex bc. of some other shit dependencies, just let it as is, and we deploy the liquidity on L2
+  // 2.: make xTransfer UI working
+  // 3.: New blockscout UI (-> for that i need rbuilder in amd64 and arm64 pushed)
   const results = useMultipleContractSingleData(pairAddresses, PAIR_INTERFACE, 'getReserves')
 
   return useMemo(() => {
@@ -63,22 +67,22 @@ export function usePairs(currencies: [Currency | undefined, Currency | undefined
       if (!tokenA || !tokenB || tokenA.equals(tokenB)) return [PairState.INVALID, null]
 
       // For L2 chains, assume the pair exists if both tokens are valid
-      if (isL2Chain(chainId) && tokenA && tokenB) {
-        try {
-          // Create a dummy pair with minimal liquidity just to satisfy the interface
-          const dummyAmount = '1000000' // Small amount to prevent price impact warnings
-          return [
-            PairState.EXISTS,
-            new Pair(
-              new TokenAmount(tokenA, dummyAmount),
-              new TokenAmount(tokenB, dummyAmount)
-            )
-          ]
-        } catch (error) {
-          console.debug('Failed to create L2 pair', { tokenA, tokenB, error })
-          return [PairState.INVALID, null]
-        }
-      }
+      // if (isL2Chain(chainId) && tokenA && tokenB) {
+      //   try {
+      //     // Create a dummy pair with minimal liquidity just to satisfy the interface
+      //     const dummyAmount = '1000000' // Small amount to prevent price impact warnings
+      //     return [
+      //       PairState.EXISTS,
+      //       new Pair(
+      //         new TokenAmount(tokenA, dummyAmount),
+      //         new TokenAmount(tokenB, dummyAmount)
+      //       )
+      //     ]
+      //   } catch (error) {
+      //     console.debug('Failed to create L2 pair', { tokenA, tokenB, error })
+      //     return [PairState.INVALID, null]
+      //   }
+      // }
 
       // Original L1 logic
       if (!reserves) return [PairState.NOT_EXISTS, null]
@@ -89,7 +93,7 @@ export function usePairs(currencies: [Currency | undefined, Currency | undefined
         new Pair(new TokenAmount(token0, reserve0.toString()), new TokenAmount(token1, reserve1.toString()))
       ]
     })
-  }, [results, tokens, chainId])
+  }, [results, tokens])
 }
 
 export function usePair(tokenA?: Currency, tokenB?: Currency): [PairState, Pair | null] {
