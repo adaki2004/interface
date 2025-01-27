@@ -54,7 +54,8 @@ export function usePairs(currencies: [Currency | undefined, Currency | undefined
   // Dani/Brecht todos:
   // 1.: This needs to get info from L1 !! Instead of L2, so that we dont need to deploy liquidity on L2 -> If complex bc. of some other shit dependencies, just let it as is, and we deploy the liquidity on L2
   // 2.: make xTransfer UI working
-  // 3.: New blockscout UI (-> for that i need rbuilder in amd64 and arm64 pushed)
+  // 3.: verify contracts (xTaiko, xSloth) 
+  // 4.: New blockscout UI (-> for that i need rbuilder in amd64 and arm64 pushed)
   const results = useMultipleContractSingleData(pairAddresses, PAIR_INTERFACE, 'getReserves')
 
   return useMemo(() => {
