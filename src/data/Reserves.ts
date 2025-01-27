@@ -1,13 +1,22 @@
-import { TokenAmount, Pair, Currency } from '@uniswap/sdk'
-import { useMemo } from 'react'
+// Dani/Brecht todos:
+// 1.: This needs to get info from L1 !! Instead of L2, so that we dont need to deploy liquidity on L2 -> If complex bc. of some other shit dependencies, just let it as is, and we deploy the liquidity on L2
+// 2.: make xTransfer UI working
+// 3.: verify contracts (xTaiko, xSloth) 
+// 4.: New blockscout UI (-> for that i need rbuilder in amd64 and arm64 pushed)
+import { TokenAmount, Pair, Currency, Token } from '@uniswap/sdk'
+import { Contract } from '@ethersproject/contracts'
+import { JsonRpcProvider } from '@ethersproject/providers'
+import { useMemo, useState, useEffect } from 'react'
 import { abi as IUniswapV2PairABI } from '@uniswap/v2-core/build/IUniswapV2Pair.json'
 import { Interface } from '@ethersproject/abi'
 import { useActiveWeb3React } from '../hooks'
-
 import { useMultipleContractSingleData } from '../state/multicall/hooks'
 import { wrappedCurrency } from '../utils/wrappedCurrency'
 
 const PAIR_INTERFACE = new Interface(IUniswapV2PairABI)
+
+const L1_RPC_URL = 'http://127.0.0.1:32002'
+const l1Provider = new JsonRpcProvider(L1_RPC_URL)
 
 export enum PairState {
   LOADING,
@@ -16,7 +25,6 @@ export enum PairState {
   INVALID
 }
 
-// Add these constants
 const L2_CHAIN_IDS = {
   L2A: 167010,
   L2B: 167011
@@ -24,6 +32,41 @@ const L2_CHAIN_IDS = {
 
 const isL2Chain = (chainId?: number): boolean => {
   return chainId === L2_CHAIN_IDS.L2A || chainId === L2_CHAIN_IDS.L2B
+}
+
+function useL1Reserves(pairAddresses: (string | undefined)[], shouldFetch: boolean) {
+  const [reserves, setReserves] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!shouldFetch || !pairAddresses.length) return
+
+    async function fetchL1Reserves() {
+      setLoading(true)
+      try {
+        const validAddresses = pairAddresses.filter((addr): addr is string => !!addr)
+        const reservePromises = validAddresses.map(async (address) => {
+          const pair = new Contract(address, PAIR_INTERFACE, l1Provider)
+          return pair.getReserves()
+        })
+
+        const results = await Promise.all(reservePromises)
+        setReserves(results.map(result => ({ result, loading: false })))
+        setError(null)
+      } catch (err) {
+        console.error('Failed to fetch L1 reserves:', err)
+        setError(err instanceof Error ? err.message : 'Failed to fetch L1 reserves')
+        setReserves([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchL1Reserves()
+  }, [pairAddresses, shouldFetch])
+
+  return { reserves, loading, error }
 }
 
 export function usePairs(currencies: [Currency | undefined, Currency | undefined][]): [PairState, Pair | null][] {
@@ -41,60 +84,63 @@ export function usePairs(currencies: [Currency | undefined, Currency | undefined
   const pairAddresses = useMemo(
     () =>
       tokens.map(([tokenA, tokenB]) => {
-        // For L2 chains, we don't need to check local liquidity
-        if (isL2Chain(chainId) && tokenA && tokenB) {
-          return Pair.getAddress(tokenA, tokenB) // This is just for interface compatibility
+        if (!tokenA || !tokenB || tokenA.equals(tokenB)) return undefined
+
+        if (isL2Chain(chainId)) {
+          const l1TokenA = new Token(160010, tokenA.address, tokenA.decimals, tokenA.symbol, tokenA.name)
+          const l1TokenB = new Token(160010, tokenB.address, tokenB.decimals, tokenB.symbol, tokenB.name)
+          return Pair.getAddress(l1TokenA, l1TokenB)
         }
 
-        return tokenA && tokenB && !tokenA.equals(tokenB) ? Pair.getAddress(tokenA, tokenB) : undefined
+        return Pair.getAddress(tokenA, tokenB)
       }),
     [tokens, chainId]
   )
 
-  // Dani/Brecht todos:
-  // 1.: This needs to get info from L1 !! Instead of L2, so that we dont need to deploy liquidity on L2 -> If complex bc. of some other shit dependencies, just let it as is, and we deploy the liquidity on L2
-  // 2.: make xTransfer UI working
-  // 3.: verify contracts (xTaiko, xSloth) 
-  // 4.: New blockscout UI (-> for that i need rbuilder in amd64 and arm64 pushed)
-  const results = useMultipleContractSingleData(pairAddresses, PAIR_INTERFACE, 'getReserves')
+  const isL2 = isL2Chain(chainId)
+  const { reserves: l1Reserves, loading: l1Loading } = useL1Reserves(pairAddresses, isL2)
+  const l2Results = useMultipleContractSingleData(
+    pairAddresses,
+    PAIR_INTERFACE,
+    'getReserves'
+  )
+
+  const results = isL2 ? l1Reserves : l2Results
 
   return useMemo(() => {
-    return results.map((result, i) => {
-      const { result: reserves, loading } = result
+    return pairAddresses.map((_, i) => {
       const tokenA = tokens[i][0]
       const tokenB = tokens[i][1]
 
-      if (loading) return [PairState.LOADING, null]
-      if (!tokenA || !tokenB || tokenA.equals(tokenB)) return [PairState.INVALID, null]
+      if (!tokenA || !tokenB || tokenA.equals(tokenB)) {
+        return [PairState.INVALID, null]
+      }
 
-      // For L2 chains, assume the pair exists if both tokens are valid
-      // if (isL2Chain(chainId) && tokenA && tokenB) {
-      //   try {
-      //     // Create a dummy pair with minimal liquidity just to satisfy the interface
-      //     const dummyAmount = '1000000' // Small amount to prevent price impact warnings
-      //     return [
-      //       PairState.EXISTS,
-      //       new Pair(
-      //         new TokenAmount(tokenA, dummyAmount),
-      //         new TokenAmount(tokenB, dummyAmount)
-      //       )
-      //     ]
-      //   } catch (error) {
-      //     console.debug('Failed to create L2 pair', { tokenA, tokenB, error })
-      //     return [PairState.INVALID, null]
-      //   }
-      // }
+      const result = results[i]
+      if (!result) {
+        return [PairState.LOADING, null]
+      }
 
-      // Original L1 logic
+      const { result: reserves, loading } = result
+      if (loading || l1Loading) return [PairState.LOADING, null]
       if (!reserves) return [PairState.NOT_EXISTS, null]
-      const { reserve0, reserve1 } = reserves
-      const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA]
-      return [
-        PairState.EXISTS,
-        new Pair(new TokenAmount(token0, reserve0.toString()), new TokenAmount(token1, reserve1.toString()))
-      ]
+
+      try {
+        const { reserve0, reserve1 } = reserves
+        const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA]
+        return [
+          PairState.EXISTS,
+          new Pair(
+            new TokenAmount(token0, reserve0.toString()),
+            new TokenAmount(token1, reserve1.toString())
+          )
+        ]
+      } catch (error) {
+        console.error('Failed to create pair:', error)
+        return [PairState.INVALID, null]
+      }
     })
-  }, [results, tokens])
+  }, [results, tokens, l1Loading, pairAddresses])
 }
 
 export function usePair(tokenA?: Currency, tokenB?: Currency): [PairState, Pair | null] {
