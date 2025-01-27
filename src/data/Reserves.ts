@@ -31,7 +31,16 @@ export function usePairs(currencies: [Currency | undefined, Currency | undefined
   const pairAddresses = useMemo(
     () =>
       tokens.map(([tokenA, tokenB]) => {
-        return tokenA && tokenB && !tokenA.equals(tokenB) ? Pair.getAddress(tokenA, tokenB) : undefined
+        try {
+          // Add validation to ensure both tokens exist and are from the same chain
+          if (tokenA && tokenB && !tokenA.equals(tokenB) && tokenA.chainId === tokenB.chainId) {
+            return Pair.getAddress(tokenA, tokenB)
+          }
+          return undefined
+        } catch (error) {
+          console.debug('Failed to get pair address', { tokenA, tokenB, error })
+          return undefined
+        }
       }),
     [tokens]
   )
@@ -47,12 +56,21 @@ export function usePairs(currencies: [Currency | undefined, Currency | undefined
       if (loading) return [PairState.LOADING, null]
       if (!tokenA || !tokenB || tokenA.equals(tokenB)) return [PairState.INVALID, null]
       if (!reserves) return [PairState.NOT_EXISTS, null]
-      const { reserve0, reserve1 } = reserves
-      const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA]
-      return [
-        PairState.EXISTS,
-        new Pair(new TokenAmount(token0, reserve0.toString()), new TokenAmount(token1, reserve1.toString()))
-      ]
+      
+      try {
+        // Add chain ID validation before sorting
+        if (tokenA.chainId !== tokenB.chainId) return [PairState.INVALID, null]
+        
+        const { reserve0, reserve1 } = reserves
+        const [token0, token1] = tokenA.sortsBefore(tokenB) ? [tokenA, tokenB] : [tokenB, tokenA]
+        return [
+          PairState.EXISTS,
+          new Pair(new TokenAmount(token0, reserve0.toString()), new TokenAmount(token1, reserve1.toString()))
+        ]
+      } catch (error) {
+        console.debug('Failed to create pair', { tokenA, tokenB, error })
+        return [PairState.INVALID, null]
+      }
     })
   }, [results, tokens])
 }
