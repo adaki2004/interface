@@ -195,6 +195,7 @@ class MiniRpcProvider implements AsyncSendable {
     this.batchTimeoutId = this.batchTimeoutId ?? setTimeout(this.clearBatch, this.batchWaitTimeMs)
     return promise
   }
+}
 
 export class NetworkConnector extends AbstractConnector {
   private readonly providers: { [chainId: number]: MiniRpcProvider }
