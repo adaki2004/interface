@@ -1,5 +1,5 @@
 # Use Node.js as the base image
-FROM node:18
+FROM node:16
 
 # Set working directory
 WORKDIR /app
@@ -24,6 +24,12 @@ COPY . .
 
 # Expose the necessary port
 EXPOSE 3000
+# Set environment variable to allow connections from outside localhost
+ENV CI=true
+ENV WATCHPACK_POLLING=true
+ENV WDS_SOCKET_HOST=0.0.0.0
+ENV WDS_SOCKET_PORT=3000
 
-# Start the app
-CMD ["yarn", "start"]
+# Start the app with nodemon to keep it running
+CMD ["sh", "-c", "yarn start --host 0.0.0.0"]
+
