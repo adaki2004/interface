@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react'
-// import styled from 'styled-components'
+import styled from 'styled-components'
 import { ButtonError } from '../../components/Button'
 import { AutoColumn } from '../../components/Column'
 import { SwapPoolTabs } from '../../components/NavigationTabs'
@@ -13,105 +13,104 @@ import { parseUnits } from '@ethersproject/units'
 import { useXTransferCallback, XTransferCallbackState } from '../../hooks/useXTransferCallback'
 import { useNetworkChangeHandler } from '../../hooks/useNetworkChangeHandler'
 
-// const InputPanel = styled.div`
-//   ${({ theme }) => theme.flexColumnNoWrap}
-//   position: relative;
-//   border-radius: 20px;
-//   background-color: ${({ theme }) => theme.bg1};
-//   z-index: 1;
-//   width: 100%;
-// `
+const InputPanel = styled.div`
+  ${({ theme }) => theme.flexColumnNoWrap}
+  position: relative;
+  border-radius: 20px;
+  background-color: ${({ theme }) => theme.bg1};
+  z-index: 1;
+  width: 100%;
+`
 
-// const Container = styled.div`
-//   border-radius: 20px;
-//   border: 1px solid ${({ theme }) => theme.bg2};
-//   background-color: ${({ theme }) => theme.bg1};
-// `
+const Container = styled.div`
+  border-radius: 20px;
+  border: 1px solid ${({ theme }) => theme.bg2};
+  background-color: ${({ theme }) => theme.bg1};
+`
 
-// const LabelRow = styled.div`
-//   ${({ theme }) => theme.flexRowNoWrap}
-//   align-items: center;
-//   color: ${({ theme }) => theme.text1};
-//   font-size: 0.75rem;
-//   line-height: 1rem;
-//   padding: 0.75rem 1rem 0 1rem;
-//   span:hover {
-//     cursor: pointer;
-//     color: ${({ theme }) => theme.text2};
-//   }
-// `
+const LabelRow = styled.div`
+  ${({ theme }) => theme.flexRowNoWrap}
+  align-items: center;
+  color: ${({ theme }) => theme.text1};
+  font-size: 0.75rem;
+  line-height: 1rem;
+  padding: 0.75rem 1rem 0 1rem;
+  span:hover {
+    cursor: pointer;
+    color: ${({ theme }) => theme.text2};
+  }
+`
 
-// const InputRow = styled.div`
-//   ${({ theme }) => theme.flexRowNoWrap}
-//   align-items: center;
-//   padding: 0.75rem 0.5rem 0.75rem 1rem;
-// `
+const InputRow = styled.div`
+  ${({ theme }) => theme.flexRowNoWrap}
+  align-items: center;
+  padding: 0.75rem 0.5rem 0.75rem 1rem;
+`
 
-// const StyledInput = styled.input`
-//   position: relative;
-//   display: flex;
-//   padding: 16px;
-//   align-items: center;
-//   width: 100%;
-//   white-space: nowrap;
-//   background: none;
-//   border: none;
-//   outline: none;
-//   border-radius: 20px;
-//   color: ${({ theme }) => theme.text1};
-//   border-style: none;
-//   font-size: 18px;
-//   ::placeholder {
-//     color: ${({ theme }) => theme.text4};
-//   }
-// `
-// const ChainSelect = styled.select`
-//   width: 100%;
-//   padding: 16px;
-//   border-radius: 20px;
-//   background-color: ${({ theme }) => theme.primary1};
-//   border: none;
-//   color: white;
-//   cursor: pointer;
-//   font-size: 16px;
-//   -webkit-appearance: none;
-//   appearance: none;
-//   background-image: url("data:image/svg+xml,%3Csvg width='12' height='7' viewBox='0 0 12 7' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0.97168 1L6.20532 6L11.439 1' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-//   background-repeat: no-repeat;
-//   background-position: right 20px center;
+const StyledInput = styled.input`
+  position: relative;
+  display: flex;
+  padding: 16px;
+  align-items: center;
+  width: 100%;
+  white-space: nowrap;
+  background: none;
+  border: none;
+  outline: none;
+  border-radius: 20px;
+  color: ${({ theme }) => theme.text1};
+  border-style: none;
+  font-size: 18px;
+  ::placeholder {
+    color: ${({ theme }) => theme.text4};
+  }
+`
 
-//   &:focus {
-//     outline: none;
-//     box-shadow: none;
-//   }
+const ChainSelect = styled.select`
+  width: 100%;
+  padding: 16px;
+  border-radius: 20px;
+  background-color: ${({ theme }) => theme.primary1};
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='7' viewBox='0 0 12 7' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0.97168 1L6.20532 6L11.439 1' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 20px center;
 
-//   &:hover {
-//     opacity: 0.9;
-//   }
+  &:focus {
+    outline: none;
+    box-shadow: none;
+  }
 
-//   option {
-//     color: ${({ theme }) => theme.text1};
-//     background: ${({ theme }) => theme.bg1};
-//     padding: 20px;
-//   }
-// `
+  &:hover {
+    opacity: 0.9;
+  }
+
+  option {
+    color: ${({ theme }) => theme.text1};
+    background: ${({ theme }) => theme.bg1};
+    padding: 20px;
+  }
+`
 
 type ChainOption = {
   id: number
   name: string
 }
 
-// Set proper chain ids
 const CHAIN_OPTIONS: ChainOption[] = [
-  { id: 167010, name: 'Gwyneth L2A' },   // L2A chain ID
-  { id: 167011, name: 'Gwyneth L2B' }    // L2B chain ID
+  { id: 167010, name: 'Gwyneth L2A' },
+  { id: 167011, name: 'Gwyneth L2B' }
 ]
 
 export default function XTransfer() {
   const { account, chainId } = useActiveWeb3React()
   useNetworkChangeHandler()
   
-  // Local state
   const [amount, setAmount] = useState('')
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null)
   const [recipient, setRecipient] = useState(account ?? '')
@@ -119,20 +118,18 @@ export default function XTransfer() {
   const [transferState, setTransferState] = useState<{
     attempting: boolean;
     error: string | null;
+    txHash?: string;
   }>({
     attempting: false,
     error: null,
   })
 
-  // Filter out current chain from destination options
   const availableChains = CHAIN_OPTIONS.filter(chain => chain.id !== chainId)
 
-  // Parse amount to BigNumber
   const parsedAmount = selectedCurrency && amount 
     ? parseUnits(amount, selectedCurrency.decimals)
     : undefined
 
-  // Get xTransfer callback
   const { state: xTransferState, callback: xTransferCallback, error: xTransferError } = useXTransferCallback(
     selectedCurrency instanceof Token ? selectedCurrency.address : undefined,
     destinationChain,
@@ -149,24 +146,44 @@ export default function XTransfer() {
   
     setTransferState({ attempting: true, error: null })
     try {
-      await xTransferCallback()
+      const txHash = await xTransferCallback()
+      setTransferState({ 
+        attempting: false, 
+        error: null,
+        txHash 
+      })
       setAmount('')
-    } catch (err) {  // Remove the type annotation from catch clause
-      const error = err as Error  // Type assertion here instead
+    } catch (err) {
+      const error = err as Error
       console.error('XTransfer failed:', error)
       setTransferState({
         attempting: false,
-        error: error.message || 'Failed to transfer'
+        error: error.message || 'Failed to transfer',
+        txHash: undefined
       })
     }
   }
 
-  // Determine if the transfer can proceed
-  const isValid = !!account && 
-                 !!selectedCurrency && 
-                 !!destinationChain && 
-                 !!recipient && 
-                 parseFloat(amount) > 0
+  // Get validation message based on current state
+  const getValidationMessage = (): string | null => {
+    if (!account) return 'Connect wallet to transfer'
+    if (!selectedCurrency) return 'Select a token'
+    if (!amount || parseFloat(amount) <= 0) return 'Enter amount'
+    if (!recipient) return 'Enter recipient address'
+    if (!destinationChain) return 'Select destination chain'
+    if (xTransferState === XTransferCallbackState.INVALID) return null
+    return null
+  }
+
+  const validationMessage = getValidationMessage()
+  const isTransferDisabled = !!validationMessage || transferState.attempting
+
+  const getButtonText = () => {
+    if (transferState.attempting) return 'Transferring...'
+    if (transferState.error) return transferState.error
+    if (validationMessage) return validationMessage
+    return 'Transfer'
+  }
 
   return (
     <>
@@ -174,7 +191,6 @@ export default function XTransfer() {
         <SwapPoolTabs active={'xtransfer'} />
         <Wrapper>
           <AutoColumn gap="20px">
-            {/* Amount Input */}
             <CurrencyInputPanel
               label="Amount"
               value={amount}
@@ -186,51 +202,60 @@ export default function XTransfer() {
               showCommonBases={true}
             />
 
-            {/* Recipient Address Input */}
-            <AutoColumn gap="8px">
-              <Text fontSize={14}>Recipient Address</Text>
-              <input
-                className="recipient-input"
-                type="text"
-                value={recipient}
-                onChange={e => setRecipient(e.target.value)}
-                placeholder="0x..."
-              />
-            </AutoColumn>
+            <InputPanel>
+              <Container>
+                <LabelRow>
+                  <Text fontSize={14}>Recipient Address</Text>
+                </LabelRow>
+                <InputRow>
+                  <StyledInput
+                    placeholder="0x..."
+                    value={recipient}
+                    onChange={e => setRecipient(e.target.value)}
+                  />
+                </InputRow>
+              </Container>
+            </InputPanel>
 
-            {/* Destination Chain Selector */}
-            <AutoColumn gap="8px">
-              <Text fontSize={14}>Destination Chain</Text>
-              <select
-                value={destinationChain}
-                onChange={e => setDestinationChain(Number(e.target.value))}
-                className="chain-select"
-              >
-                <option value="">Select Destination Chain</option>
-                {availableChains.map(chain => (
-                  <option key={chain.id} value={chain.id}>
-                    {chain.name}
-                  </option>
-                ))}
-              </select>
-            </AutoColumn>
+            <InputPanel>
+              <Container>
+                <LabelRow>
+                  <Text fontSize={14}>Destination Chain</Text>
+                </LabelRow>
+                <InputRow>
+                  <ChainSelect
+                    value={destinationChain || ''}
+                    onChange={e => setDestinationChain(Number(e.target.value))}
+                  >
+                    <option value="">Select Destination Chain</option>
+                    {availableChains.map(chain => (
+                      <option key={chain.id} value={chain.id}>
+                        {chain.name}
+                      </option>
+                    ))}
+                  </ChainSelect>
+                </InputRow>
+              </Container>
+            </InputPanel>
 
             <ButtonError
               onClick={handleXTransfer}
-              disabled={!isValid || xTransferState === XTransferCallbackState.INVALID || transferState.attempting}
+              disabled={isTransferDisabled}
               error={!!transferState.error}
             >
               <Text fontSize={20} fontWeight={500}>
-                {transferState.attempting 
-                  ? 'Transferring...' 
-                  : transferState.error 
-                  ? transferState.error 
-                  : 'Transfer'}
+                {getButtonText()}
               </Text>
             </ButtonError>
 
-            {xTransferError && (
-              <Text color="red" fontSize={14}>
+            {transferState.txHash && (
+              <Text color="green" fontSize={14} style={{ textAlign: 'center' }}>
+                Transaction submitted
+              </Text>
+            )}
+
+            {xTransferError && !transferState.error && !validationMessage && (
+              <Text color="red" fontSize={14} style={{ textAlign: 'center' }}>
                 {xTransferError}
               </Text>
             )}
