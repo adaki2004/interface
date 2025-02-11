@@ -7,19 +7,12 @@ interface NetworkConnectorArguments {
   defaultChainId?: number
 }
 
-// taken from ethers.js, compatible interface with web3 provider
 type AsyncSendable = {
   isMetaMask?: boolean
   host?: string
   path?: string
   sendAsync?: (request: any, callback: (error: any, response: any) => void) => void
   send?: (request: any, callback: (error: any, response: any) => void) => void
-}
-
-class RequestError extends Error {
-  constructor(message: string, public code: number, public data?: unknown) {
-    super(message)
-  }
 }
 
 interface BatchItem {
@@ -46,7 +39,6 @@ class MiniRpcProvider implements AsyncSendable {
     const parsed = new URL(url)
     this.host = parsed.host
     this.path = parsed.pathname
-    // how long to wait to batch calls
     this.batchWaitTimeMs = batchWaitTimeMs ?? 50
   }
 
@@ -68,75 +60,49 @@ class MiniRpcProvider implements AsyncSendable {
         },
         mode: 'cors',
         body: JSON.stringify(batch.map(item => item.request))
-      });
-  
+      })
+
       if (!response.ok) {
-        console.warn(`Network request failed with status ${response.status}`);
+        console.warn(`Network request failed with status ${response.status}`)
         batch.forEach(({ resolve }) => {
           resolve({ 
             jsonrpc: '2.0',
+            id: this.nextId++,
             error: {
               code: -32000,
               message: `Network error: ${response.status} ${response.statusText}`
             }
-          });
-        });
-        return;
+          })
+        })
+        return
       }
-  
-      let json;
-      try {
-        json = await response.json();
-      } catch (error) {
-        console.warn('Failed to parse JSON response:', error);
-        batch.forEach(({ resolve }) => {
-          resolve({
-            jsonrpc: '2.0',
-            error: {
-              code: -32700,
-              message: 'Invalid JSON response'
-            }
-          });
-        });
-        return;
-      }
-  
+
+      const json = await response.json()
       const byKey = batch.reduce<{ [id: number]: BatchItem }>((memo, current) => {
-        memo[current.request.id] = current;
-        return memo;
-      }, {});
-  
+        memo[current.request.id] = current
+        return memo
+      }, {})
+
       for (const result of json) {
-        const item = byKey[result.id];
-        if (!item?.resolve) continue;
-  
-        if ('error' in result) {
-          item.resolve(result);
-        } else if ('result' in result) {
-          item.resolve(result);
-        } else {
-          item.resolve({
-            jsonrpc: '2.0',
-            error: {
-              code: -32603,
-              message: `Invalid response for ${item.request.method} request`
-            }
-          });
-        }
+        const item = byKey[result.id]
+        if (!item?.resolve) continue
+
+        item.resolve(result)
       }
     } catch (error) {
-      console.warn('Network connection error:', error);
+      console.warn('Network connection error:', error)
       batch.forEach(({ resolve }) => {
         resolve({
           jsonrpc: '2.0',
+          id: this.nextId++,
           error: {
             code: -32603,
             message: 'Network connection unavailable'
           }
-        });
-      });
+        })
+      })
     }
-  };
+  }
 
   public readonly sendAsync = (
     request: { jsonrpc: '2.0'; id: number | string | null; method: string; params?: unknown[] | object },
@@ -144,7 +110,14 @@ class MiniRpcProvider implements AsyncSendable {
   ): void => {
     this.request(request.method, request.params)
       .then(result => callback(null, { jsonrpc: '2.0', id: request.id, result }))
-      .catch(error => callback(error, null))
+      .catch(error => callback(null, { 
+        jsonrpc: '2.0', 
+        id: request.id, 
+        error: { 
+          code: -32603, 
+          message: error?.message || 'Request failed' 
+        } 
+      }))
   }
 
   public readonly request = async (
@@ -157,7 +130,7 @@ class MiniRpcProvider implements AsyncSendable {
     if (method === 'eth_chainId') {
       return `0x${this.chainId.toString(16)}`
     }
-    const promise = new Promise((resolve, reject) => {
+    const promise = new Promise((resolve) => {
       this.batch.push({
         request: {
           jsonrpc: '2.0',
@@ -166,7 +139,13 @@ class MiniRpcProvider implements AsyncSendable {
           params
         },
         resolve,
-        reject
+        reject: () => resolve({ 
+          jsonrpc: '2.0', 
+          error: { 
+            code: -32603, 
+            message: 'Request failed' 
+          } 
+        })
       })
     })
     this.batchTimeoutId = this.batchTimeoutId ?? setTimeout(this.clearBatch, this.batchWaitTimeMs)
