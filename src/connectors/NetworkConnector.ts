@@ -50,7 +50,7 @@ class MiniRpcProvider implements AsyncSendable {
     this.batchWaitTimeMs = batchWaitTimeMs ?? 50
   }
 
-  ublic readonly clearBatch = async () => {
+  public readonly clearBatch = async () => {
     console.debug('Clearing batch', this.batch)
     const batch = this.batch
     this.batch = []
@@ -64,15 +64,14 @@ class MiniRpcProvider implements AsyncSendable {
           accept: 'application/json',
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
         },
         mode: 'cors',
         body: JSON.stringify(batch.map(item => item.request))
-      })
+      });
   
       if (!response.ok) {
-        // Handle non-200 responses gracefully
-        console.warn(`Network request failed with status ${response.status}`)
+        console.warn(`Network request failed with status ${response.status}`);
         batch.forEach(({ resolve }) => {
           resolve({ 
             jsonrpc: '2.0',
@@ -80,16 +79,16 @@ class MiniRpcProvider implements AsyncSendable {
               code: -32000,
               message: `Network error: ${response.status} ${response.statusText}`
             }
-          })
-        })
-        return
+          });
+        });
+        return;
       }
   
-      let json
+      let json;
       try {
-        json = await response.json()
+        json = await response.json();
       } catch (error) {
-        console.warn('Failed to parse JSON response:', error)
+        console.warn('Failed to parse JSON response:', error);
         batch.forEach(({ resolve }) => {
           resolve({
             jsonrpc: '2.0',
@@ -97,41 +96,36 @@ class MiniRpcProvider implements AsyncSendable {
               code: -32700,
               message: 'Invalid JSON response'
             }
-          })
-        })
-        return
+          });
+        });
+        return;
       }
   
       const byKey = batch.reduce<{ [id: number]: BatchItem }>((memo, current) => {
-        memo[current.request.id] = current
-        return memo
-      }, {})
+        memo[current.request.id] = current;
+        return memo;
+      }, {});
   
       for (const result of json) {
-        const {
-          resolve,
-          request: { method }
-        } = byKey[result.id]
-        
-        if (resolve) {
-          if ('error' in result) {
-            resolve(result) // Pass through RPC errors instead of rejecting
-          } else if ('result' in result) {
-            resolve(result)
-          } else {
-            resolve({
-              jsonrpc: '2.0',
-              error: {
-                code: -32603,
-                message: `Invalid response for ${method} request`
-              }
-            })
-          }
+        const item = byKey[result.id];
+        if (!item?.resolve) continue;
+  
+        if ('error' in result) {
+          item.resolve(result);
+        } else if ('result' in result) {
+          item.resolve(result);
+        } else {
+          item.resolve({
+            jsonrpc: '2.0',
+            error: {
+              code: -32603,
+              message: `Invalid response for ${item.request.method} request`
+            }
+          });
         }
       }
     } catch (error) {
-      // Handle network/connection errors gracefully
-      console.warn('Network connection error:', error)
+      console.warn('Network connection error:', error);
       batch.forEach(({ resolve }) => {
         resolve({
           jsonrpc: '2.0',
@@ -139,10 +133,10 @@ class MiniRpcProvider implements AsyncSendable {
             code: -32603,
             message: 'Network connection unavailable'
           }
-        })
-      })
+        });
+      });
     }
-  }
+  };
 
   public readonly sendAsync = (
     request: { jsonrpc: '2.0'; id: number | string | null; method: string; params?: unknown[] | object },
