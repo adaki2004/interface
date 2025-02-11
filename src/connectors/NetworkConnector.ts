@@ -50,61 +50,97 @@ class MiniRpcProvider implements AsyncSendable {
     this.batchWaitTimeMs = batchWaitTimeMs ?? 50
   }
 
-  public readonly clearBatch = async () => {
+  ublic readonly clearBatch = async () => {
     console.debug('Clearing batch', this.batch)
     const batch = this.batch
     this.batch = []
     this.batchTimeoutId = null
-    let response: Response
+    
     try {
-      response = await fetch(this.url, {
+      const response = await fetch(this.url, {
         method: 'POST',
         headers: { 
           'content-type': 'application/json', 
           accept: 'application/json',
-          'Access-Control-Allow-Origin': '*',  // Add this
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',  // Add this
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',  // Add this
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
-        mode: 'cors',  // Add this
+        mode: 'cors',
         body: JSON.stringify(batch.map(item => item.request))
       })
-    } catch (error) {
-      batch.forEach(({ reject }) => reject(new Error('Failed to send batch call')))
-      return
-    }
-
-    if (!response.ok) {
-      batch.forEach(({ reject }) => reject(new RequestError(`${response.status}: ${response.statusText}`, -32000)))
-      return
-    }
-
-    let json
-    try {
-      json = await response.json()
-    } catch (error) {
-      batch.forEach(({ reject }) => reject(new Error('Failed to parse JSON response')))
-      return
-    }
-    const byKey = batch.reduce<{ [id: number]: BatchItem }>((memo, current) => {
-      memo[current.request.id] = current
-      return memo
-    }, {})
-    for (const result of json) {
-      const {
-        resolve,
-        reject,
-        request: { method }
-      } = byKey[result.id]
-      if (resolve && reject) {
-        if ('error' in result) {
-          reject(new RequestError(result?.error?.message, result?.error?.code, result?.error?.data))
-        } else if ('result' in result) {
-          resolve(result.result)
-        } else {
-          reject(new RequestError(`Received unexpected JSON-RPC response to ${method} request.`, -32000, result))
+  
+      if (!response.ok) {
+        // Handle non-200 responses gracefully
+        console.warn(`Network request failed with status ${response.status}`)
+        batch.forEach(({ resolve }) => {
+          resolve({ 
+            jsonrpc: '2.0',
+            error: {
+              code: -32000,
+              message: `Network error: ${response.status} ${response.statusText}`
+            }
+          })
+        })
+        return
+      }
+  
+      let json
+      try {
+        json = await response.json()
+      } catch (error) {
+        console.warn('Failed to parse JSON response:', error)
+        batch.forEach(({ resolve }) => {
+          resolve({
+            jsonrpc: '2.0',
+            error: {
+              code: -32700,
+              message: 'Invalid JSON response'
+            }
+          })
+        })
+        return
+      }
+  
+      const byKey = batch.reduce<{ [id: number]: BatchItem }>((memo, current) => {
+        memo[current.request.id] = current
+        return memo
+      }, {})
+  
+      for (const result of json) {
+        const {
+          resolve,
+          request: { method }
+        } = byKey[result.id]
+        
+        if (resolve) {
+          if ('error' in result) {
+            resolve(result) // Pass through RPC errors instead of rejecting
+          } else if ('result' in result) {
+            resolve(result)
+          } else {
+            resolve({
+              jsonrpc: '2.0',
+              error: {
+                code: -32603,
+                message: `Invalid response for ${method} request`
+              }
+            })
+          }
         }
       }
+    } catch (error) {
+      // Handle network/connection errors gracefully
+      console.warn('Network connection error:', error)
+      batch.forEach(({ resolve }) => {
+        resolve({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: 'Network connection unavailable'
+          }
+        })
+      })
     }
   }
 
