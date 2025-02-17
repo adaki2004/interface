@@ -103,6 +103,7 @@ type ChainOption = {
 }
 
 const CHAIN_OPTIONS: ChainOption[] = [
+  { id: 160010, name: 'Gwyneth L1' },
   { id: 167010, name: 'Gwyneth L2A' },
   { id: 167011, name: 'Gwyneth L2B' }
 ]
