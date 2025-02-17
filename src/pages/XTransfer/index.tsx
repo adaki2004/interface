@@ -130,8 +130,15 @@ export default function XTransfer() {
     ? parseUnits(amount, selectedCurrency.decimals)
     : undefined
 
+  // Check if the selected currency is ETH by checking if it's not a Token instance
+  const isETH = selectedCurrency && !(selectedCurrency instanceof Token)
+
   const { state: xTransferState, callback: xTransferCallback, error: xTransferError } = useXTransferCallback(
-    selectedCurrency instanceof Token ? selectedCurrency.address : undefined,
+    isETH 
+      ? 'ETH'
+      : selectedCurrency instanceof Token 
+        ? selectedCurrency.address 
+        : undefined,
     destinationChain,
     recipient,
     parsedAmount
@@ -167,7 +174,7 @@ export default function XTransfer() {
   // Get validation message based on current state
   const getValidationMessage = (): string | null => {
     if (!account) return 'Connect wallet to transfer'
-    if (!selectedCurrency) return 'Select a token'
+    if (!selectedCurrency) return 'Select a token or ETH'
     if (!amount || parseFloat(amount) <= 0) return 'Enter amount'
     if (!recipient) return 'Enter recipient address'
     if (!destinationChain) return 'Select destination chain'
@@ -182,7 +189,7 @@ export default function XTransfer() {
     if (transferState.attempting) return 'Transferring...'
     if (transferState.error) return transferState.error
     if (validationMessage) return validationMessage
-    return 'Transfer'
+    return `Transfer ${isETH ? 'ETH' : 'Token'}`
   }
 
   return (
