@@ -1,15 +1,17 @@
 import React, { useState, useCallback } from 'react'
 import styled from 'styled-components'
-import { ButtonPrimary, ButtonError } from '../../components/Button'
+import { ButtonError } from '../../components/Button'
 import { AutoColumn } from '../../components/Column'
 import { SwapPoolTabs } from '../../components/NavigationTabs'
 import CurrencyInputPanel from '../../components/CurrencyInputPanel'
 import AppBody from '../AppBody'
 import { Wrapper } from '../Pool/styleds'
 import { useActiveWeb3React } from '../../hooks'
-import { Currency } from '@uniswap/sdk'
+import { Currency, Token } from '@uniswap/sdk'
 import { Text } from 'rebass'
-import { useWalletModalToggle } from '../../state/application/hooks'
+import { parseUnits } from '@ethersproject/units'
+import { useXTransferCallback, XTransferCallbackState } from '../../hooks/useXTransferCallback'
+import { useNetworkChangeHandler } from '../../hooks/useNetworkChangeHandler'
 
 const InputPanel = styled.div`
   ${({ theme }) => theme.flexColumnNoWrap}
@@ -63,6 +65,7 @@ const StyledInput = styled.input`
     color: ${({ theme }) => theme.text4};
   }
 `
+
 const ChainSelect = styled.select`
   width: 100%;
   padding: 16px;
@@ -99,27 +102,95 @@ type ChainOption = {
   name: string
 }
 
-// Set proper chain ids
 const CHAIN_OPTIONS: ChainOption[] = [
-  { id: 160010, name: 'Gwyneth L1' },    // L1 chain ID
-  { id: 167010, name: 'Gwyneth L2A' },   // L2A chain ID
-  { id: 167011, name: 'Gwyneth L2B' }    // L2B chain ID
+  { id: 167010, name: 'Gwyneth L2A' },
+  { id: 167011, name: 'Gwyneth L2B' }
 ]
 
 export default function XTransfer() {
   const { account, chainId } = useActiveWeb3React()
-  const toggleWalletModal = useWalletModalToggle()
+  useNetworkChangeHandler()
+  
   const [amount, setAmount] = useState('')
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null)
-  const [recipient, setRecipient] = useState('')
-  const [destinationChain, setDestinationChain] = useState('')
+  const [recipient, setRecipient] = useState(account ?? '')
+  const [destinationChain, setDestinationChain] = useState<number | undefined>()
+  const [transferState, setTransferState] = useState<{
+    attempting: boolean;
+    error: string | null;
+    txHash?: string;
+  }>({
+    attempting: false,
+    error: null,
+  })
+
+  const availableChains = CHAIN_OPTIONS.filter(chain => chain.id !== chainId)
+
+  const parsedAmount = selectedCurrency && amount 
+    ? parseUnits(amount, selectedCurrency.decimals)
+    : undefined
+
+  // Check if the selected currency is ETH by checking if it's not a Token instance
+  const isETH = selectedCurrency && !(selectedCurrency instanceof Token)
+
+  const { state: xTransferState, callback: xTransferCallback, error: xTransferError } = useXTransferCallback(
+    isETH 
+      ? 'ETH'
+      : selectedCurrency instanceof Token 
+        ? selectedCurrency.address 
+        : undefined,
+    destinationChain,
+    recipient,
+    parsedAmount
+  )
 
   const handleCurrencySelect = useCallback((currency: Currency) => {
     setSelectedCurrency(currency)
   }, [])
 
-  // Filter out current chain from destination options
-  const availableChains = CHAIN_OPTIONS.filter(chain => chain.id !== chainId)
+  const handleXTransfer = async () => {
+    if (!xTransferCallback) return
+  
+    setTransferState({ attempting: true, error: null })
+    try {
+      const txHash = await xTransferCallback()
+      setTransferState({ 
+        attempting: false, 
+        error: null,
+        txHash 
+      })
+      setAmount('')
+    } catch (err) {
+      const error = err as Error
+      console.error('XTransfer failed:', error)
+      setTransferState({
+        attempting: false,
+        error: error.message || 'Failed to transfer',
+        txHash: undefined
+      })
+    }
+  }
+
+  // Get validation message based on current state
+  const getValidationMessage = (): string | null => {
+    if (!account) return 'Connect wallet to transfer'
+    if (!selectedCurrency) return 'Select a token or ETH'
+    if (!amount || parseFloat(amount) <= 0) return 'Enter amount'
+    if (!recipient) return 'Enter recipient address'
+    if (!destinationChain) return 'Select destination chain'
+    if (xTransferState === XTransferCallbackState.INVALID) return null
+    return null
+  }
+
+  const validationMessage = getValidationMessage()
+  const isTransferDisabled = !!validationMessage || transferState.attempting
+
+  const getButtonText = () => {
+    if (transferState.attempting) return 'Transferring...'
+    if (transferState.error) return transferState.error
+    if (validationMessage) return validationMessage
+    return `Transfer ${isETH ? 'ETH' : 'Token'}`
+  }
 
   return (
     <>
@@ -127,7 +198,6 @@ export default function XTransfer() {
         <SwapPoolTabs active={'xtransfer'} />
         <Wrapper>
           <AutoColumn gap="20px">
-            {/* Amount Input */}
             <CurrencyInputPanel
               label="Amount"
               value={amount}
@@ -139,7 +209,6 @@ export default function XTransfer() {
               showCommonBases={true}
             />
 
-            {/* Recipient Address Input */}
             <InputPanel>
               <Container>
                 <LabelRow>
@@ -155,7 +224,6 @@ export default function XTransfer() {
               </Container>
             </InputPanel>
 
-            {/* Destination Chain Selector */}
             <InputPanel>
               <Container>
                 <LabelRow>
@@ -163,8 +231,8 @@ export default function XTransfer() {
                 </LabelRow>
                 <InputRow>
                   <ChainSelect
-                    value={destinationChain}
-                    onChange={e => setDestinationChain(e.target.value)}
+                    value={destinationChain || ''}
+                    onChange={e => setDestinationChain(Number(e.target.value))}
                   >
                     <option value="">Select Destination Chain</option>
                     {availableChains.map(chain => (
@@ -177,30 +245,26 @@ export default function XTransfer() {
               </Container>
             </InputPanel>
 
-            {!account ? (
-              <ButtonPrimary onClick={toggleWalletModal}>
-                <Text fontSize={20} fontWeight={500}>
-                  Connect Wallet
-                </Text>
-              </ButtonPrimary>
-            ) : (
-              <ButtonError
-                onClick={() => {
-                  console.log('Initiating cross-chain transfer:', {
-                    fromChain: chainId,
-                    toChain: destinationChain,
-                    amount,
-                    recipient,
-                    token: selectedCurrency?.symbol
-                  })
-                }}
-                disabled={!amount || !selectedCurrency || !recipient || !destinationChain}
-                error={false}
-              >
-                <Text fontSize={20} fontWeight={500} color="white">
-                  Transfer
-                </Text>
-              </ButtonError>
+            <ButtonError
+              onClick={handleXTransfer}
+              disabled={isTransferDisabled}
+              error={!!transferState.error}
+            >
+              <Text fontSize={20} fontWeight={500}>
+                {getButtonText()}
+              </Text>
+            </ButtonError>
+
+            {transferState.txHash && (
+              <Text color="green" fontSize={14} style={{ textAlign: 'center' }}>
+                Transaction submitted
+              </Text>
+            )}
+
+            {xTransferError && !transferState.error && !validationMessage && (
+              <Text color="red" fontSize={14} style={{ textAlign: 'center' }}>
+                {xTransferError}
+              </Text>
             )}
           </AutoColumn>
         </Wrapper>

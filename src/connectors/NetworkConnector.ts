@@ -7,19 +7,12 @@ interface NetworkConnectorArguments {
   defaultChainId?: number
 }
 
-// taken from ethers.js, compatible interface with web3 provider
 type AsyncSendable = {
   isMetaMask?: boolean
   host?: string
   path?: string
   sendAsync?: (request: any, callback: (error: any, response: any) => void) => void
   send?: (request: any, callback: (error: any, response: any) => void) => void
-}
-
-class RequestError extends Error {
-  constructor(message: string, public code: number, public data?: unknown) {
-    super(message)
-  }
 }
 
 interface BatchItem {
@@ -46,7 +39,6 @@ class MiniRpcProvider implements AsyncSendable {
     const parsed = new URL(url)
     this.host = parsed.host
     this.path = parsed.pathname
-    // how long to wait to batch calls
     this.batchWaitTimeMs = batchWaitTimeMs ?? 50
   }
 
@@ -55,56 +47,60 @@ class MiniRpcProvider implements AsyncSendable {
     const batch = this.batch
     this.batch = []
     this.batchTimeoutId = null
-    let response: Response
+    
     try {
-      response = await fetch(this.url, {
+      const response = await fetch(this.url, {
         method: 'POST',
         headers: { 
           'content-type': 'application/json', 
           accept: 'application/json',
-          'Access-Control-Allow-Origin': '*',  // Add this
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',  // Add this
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',  // Add this
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
         },
-        mode: 'cors',  // Add this
+        mode: 'cors',
         body: JSON.stringify(batch.map(item => item.request))
       })
-    } catch (error) {
-      batch.forEach(({ reject }) => reject(new Error('Failed to send batch call')))
-      return
-    }
 
-    if (!response.ok) {
-      batch.forEach(({ reject }) => reject(new RequestError(`${response.status}: ${response.statusText}`, -32000)))
-      return
-    }
-
-    let json
-    try {
-      json = await response.json()
-    } catch (error) {
-      batch.forEach(({ reject }) => reject(new Error('Failed to parse JSON response')))
-      return
-    }
-    const byKey = batch.reduce<{ [id: number]: BatchItem }>((memo, current) => {
-      memo[current.request.id] = current
-      return memo
-    }, {})
-    for (const result of json) {
-      const {
-        resolve,
-        reject,
-        request: { method }
-      } = byKey[result.id]
-      if (resolve && reject) {
-        if ('error' in result) {
-          reject(new RequestError(result?.error?.message, result?.error?.code, result?.error?.data))
-        } else if ('result' in result) {
-          resolve(result.result)
-        } else {
-          reject(new RequestError(`Received unexpected JSON-RPC response to ${method} request.`, -32000, result))
-        }
+      if (!response.ok) {
+        console.warn(`Network request failed with status ${response.status}`)
+        batch.forEach(({ resolve }) => {
+          resolve({ 
+            jsonrpc: '2.0',
+            id: this.nextId++,
+            error: {
+              code: -32000,
+              message: `Network error: ${response.status} ${response.statusText}`
+            }
+          })
+        })
+        return
       }
+
+      const json = await response.json()
+      const byKey = batch.reduce<{ [id: number]: BatchItem }>((memo, current) => {
+        memo[current.request.id] = current
+        return memo
+      }, {})
+
+      for (const result of json) {
+        const item = byKey[result.id]
+        if (!item?.resolve) continue
+
+        item.resolve(result)
+      }
+    } catch (error) {
+      console.warn('Network connection error:', error)
+      batch.forEach(({ resolve }) => {
+        resolve({
+          jsonrpc: '2.0',
+          id: this.nextId++,
+          error: {
+            code: -32603,
+            message: 'Network connection unavailable'
+          }
+        })
+      })
     }
   }
 
@@ -114,7 +110,14 @@ class MiniRpcProvider implements AsyncSendable {
   ): void => {
     this.request(request.method, request.params)
       .then(result => callback(null, { jsonrpc: '2.0', id: request.id, result }))
-      .catch(error => callback(error, null))
+      .catch(error => callback(null, { 
+        jsonrpc: '2.0', 
+        id: request.id, 
+        error: { 
+          code: -32603, 
+          message: error?.message || 'Request failed' 
+        } 
+      }))
   }
 
   public readonly request = async (
@@ -127,7 +130,34 @@ class MiniRpcProvider implements AsyncSendable {
     if (method === 'eth_chainId') {
       return `0x${this.chainId.toString(16)}`
     }
-    const promise = new Promise((resolve, reject) => {
+    
+    // Special handling for eth_blockNumber when network is down
+    if (method === 'eth_blockNumber') {
+      const promise = new Promise((resolve) => {
+        this.batch.push({
+          request: {
+            jsonrpc: '2.0',
+            id: this.nextId++,
+            method,
+            params
+          },
+          resolve: (result) => {
+            // If we get an error response, return a safe default
+            if ('error' in result) {
+              resolve('0x0') // Return block 0 when network is down
+            } else {
+              resolve(result)
+            }
+          },
+          reject: () => resolve('0x0') // Fallback to block 0
+        })
+      })
+      this.batchTimeoutId = this.batchTimeoutId ?? setTimeout(this.clearBatch, this.batchWaitTimeMs)
+      return promise
+    }
+  
+    // For all other methods
+    const promise = new Promise((resolve) => {
       this.batch.push({
         request: {
           jsonrpc: '2.0',
@@ -135,8 +165,31 @@ class MiniRpcProvider implements AsyncSendable {
           method,
           params
         },
-        resolve,
-        reject
+        resolve: (result) => {
+          // If we get an error response, return a safe default based on method
+          if ('error' in result) {
+            switch (method) {
+              case 'eth_getBlockByNumber':
+              case 'eth_getBlockByHash':
+                resolve({ number: '0x0', hash: '0x0', transactions: [] })
+                break
+              case 'eth_gasPrice':
+                resolve('0x0')
+                break
+              case 'eth_call':
+                resolve('0x')
+                break
+              case 'eth_getLogs':
+                resolve([])
+                break
+              default:
+                resolve(null)
+            }
+          } else {
+            resolve(result)
+          }
+        },
+        reject: () => resolve(null)
       })
     })
     this.batchTimeoutId = this.batchTimeoutId ?? setTimeout(this.clearBatch, this.batchWaitTimeMs)

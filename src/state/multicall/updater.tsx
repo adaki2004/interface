@@ -76,7 +76,7 @@ export function activeListeningKeys(
 }
 
 /**
- * Return the keys that need to be refetched
+ * Return the keys that need to be refetched, filtering out V1 calls
  * @param callResults current call result state
  * @param listeningKeys each call key mapped to how old the data can be in blocks
  * @param chainId the current chain id
@@ -90,22 +90,19 @@ export function outdatedListeningKeys(
 ): string[] {
   if (!chainId || !latestBlockNumber) return []
   const results = callResults[chainId]
-  // no results at all, load everything
   if (!results) return Object.keys(listeningKeys)
 
   return Object.keys(listeningKeys).filter(callKey => {
+    // Filter out V1 calls including getExchange
+    if (callKey.toLowerCase().includes('getexchange')) return false
+    
     const blocksPerFetch = listeningKeys[callKey]
-
     const data = callResults[chainId][callKey]
-    // no data, must fetch
     if (!data) return true
 
     const minDataBlockNumber = latestBlockNumber - (blocksPerFetch - 1)
-
-    // already fetching it for a recent enough block, don't refetch it
     if (data.fetchingBlockNumber && data.fetchingBlockNumber >= minDataBlockNumber) return false
 
-    // if data is older than minDataBlockNumber, fetch it
     return !data.blockNumber || data.blockNumber < minDataBlockNumber
   })
 }
@@ -113,7 +110,6 @@ export function outdatedListeningKeys(
 export default function Updater(): null {
   const dispatch = useDispatch<AppDispatch>()
   const state = useSelector<AppState, AppState['multicall']>(state => state.multicall)
-  // wait for listeners to settle before triggering updates
   const debouncedListeners = useDebounce(state.callListeners, 100)
   const latestBlockNumber = useBlockNumber()
   const { chainId } = useActiveWeb3React()
@@ -165,7 +161,6 @@ export default function Updater(): null {
           .then(({ results: returnData, blockNumber: fetchBlockNumber }) => {
             cancellations.current = { cancellations: [], blockNumber: latestBlockNumber }
 
-            // accumulates the length of all previous indices
             const firstCallKeyIndex = chunkedCalls.slice(0, index).reduce<number>((memo, curr) => memo + curr.length, 0)
             const lastCallKeyIndex = firstCallKeyIndex + returnData.length
 
