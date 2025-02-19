@@ -224,15 +224,30 @@ export function useTrackedTokenPairs(): [Token, Token][] {
   ])
 
   return useMemo(() => {
+    if (!chainId) return []
+    
     // dedupes pairs of tokens in the combined list
     const keyed = combinedList.reduce<{ [key: string]: [Token, Token] }>((memo, [tokenA, tokenB]) => {
-      const sorted = tokenA.sortsBefore(tokenB)
-      const key = sorted ? `${tokenA.address}:${tokenB.address}` : `${tokenB.address}:${tokenA.address}`
-      if (memo[key]) return memo
-      memo[key] = sorted ? [tokenA, tokenB] : [tokenB, tokenA]
+      // Ensure both tokens are from the current chain
+      if (tokenA.chainId !== chainId || tokenB.chainId !== chainId) {
+        return memo
+      }
+  
+      try {
+        const sorted = tokenA.sortsBefore(tokenB)
+        const key = sorted ? `${tokenA.address}:${tokenB.address}` : `${tokenB.address}:${tokenA.address}`
+        if (memo[key]) return memo
+        memo[key] = sorted ? [tokenA, tokenB] : [tokenB, tokenA]
+      } catch (error) {
+        console.debug('Failed to sort tokens', {
+          tokenA: tokenA.symbol,
+          tokenB: tokenB.symbol,
+          chainId
+        })
+      }
       return memo
     }, {})
-
+  
     return Object.keys(keyed).map(key => keyed[key])
-  }, [combinedList])
+  }, [combinedList, chainId])
 }

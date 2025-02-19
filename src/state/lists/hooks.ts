@@ -67,6 +67,45 @@ const GWYNETH_TOKENS: TokenInfo[] = [
   }
 ]
 
+const GWYNETH_L2A_TOKENS: TokenInfo[] = [
+  {
+  chainId: ChainId.GWYNETH_L2A,
+  address: '0xA12297e9F5B9E9Ca7A810725904aFAf13a1eD568',
+  name: 'Sloth Token',
+  decimals: 18,
+  symbol: 'SLOTH',
+  logoURI: undefined, // Add logo URI if available
+  tags: ['sloth']
+},
+  {
+    chainId: ChainId.GWYNETH_L2A,
+    address: '0x534Cf76B8D56ab71caC1c211c9B38C81cA8E4B45',
+    name: 'Taiko Token',
+    decimals: 18,
+    symbol: 'TAIKO',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['taiko']
+  },
+  {
+    chainId: ChainId.GWYNETH_L2A,
+    address: '0x6B2345898C657861F13C6408b73c82bb39784ec2',
+    name: 'Cheese Token',
+    decimals: 18,
+    symbol: 'CHEESE',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['cheese']
+  },
+  {
+    chainId: ChainId.GWYNETH_L2A,
+    address: '0x0a01EF051EfEeEEBE01A333F7323547494f30817',
+    name: 'Wrapped Ether',
+    decimals: 18,
+    symbol: 'WETH',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['wrapped', 'weth']
+  }
+]
+
 // Define the GWYNETH tokens
 const SEPOLIA_TOKENS: TokenInfo[] = [
   {
@@ -80,8 +119,58 @@ const SEPOLIA_TOKENS: TokenInfo[] = [
   }
 ]
 
+
+const GWYNETH_L2B_TOKENS: TokenInfo[] = [
+  {
+  chainId: ChainId.GWYNETH_L2B,
+  address: '0xA12297e9F5B9E9Ca7A810725904aFAf13a1eD568',
+  name: 'Sloth Token',
+  decimals: 18,
+  symbol: 'SLOTH',
+  logoURI: undefined, // Add logo URI if available
+  tags: ['sloth']
+},
+  {
+    chainId: ChainId.GWYNETH_L2B,
+    address: '0x534Cf76B8D56ab71caC1c211c9B38C81cA8E4B45',
+    name: 'Taiko Token',
+    decimals: 18,
+    symbol: 'TAIKO',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['taiko']
+  },
+  {
+    chainId: ChainId.GWYNETH_L2B,
+    address: '0x6B2345898C657861F13C6408b73c82bb39784ec2',
+    name: 'Cheese Token',
+    decimals: 18,
+    symbol: 'CHEESE',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['cheese']
+  },
+  {
+    chainId: ChainId.GWYNETH_L2B,
+    address: '0x0a01EF051EfEeEEBE01A333F7323547494f30817',
+    name: 'Wrapped Ether',
+    decimals: 18,
+    symbol: 'WETH',
+    logoURI: undefined, // Add logo URI if available
+    tags: ['wrapped', 'weth']
+  }
+]
+
 // Convert TokenInfo array to TokenAddressMap format
 const GWYNETH_TOKEN_MAP = GWYNETH_TOKENS.reduce<{ [tokenAddress: string]: WrappedTokenInfo }>((acc, tokenInfo) => {
+  acc[tokenInfo.address] = new WrappedTokenInfo(tokenInfo, [])
+  return acc
+}, {})
+
+const GWYNETH_L2A_TOKEN_MAP = GWYNETH_L2A_TOKENS.reduce<{ [tokenAddress: string]: WrappedTokenInfo }>((acc, tokenInfo) => {
+  acc[tokenInfo.address] = new WrappedTokenInfo(tokenInfo, [])
+  return acc
+}, {})
+
+const GWYNETH_L2B_TOKEN_MAP = GWYNETH_L2B_TOKENS.reduce<{ [tokenAddress: string]: WrappedTokenInfo }>((acc, tokenInfo) => {
   acc[tokenInfo.address] = new WrappedTokenInfo(tokenInfo, [])
   return acc
 }, {})
@@ -101,8 +190,8 @@ const EMPTY_LIST: TokenAddressMap = {
   [ChainId.GÖRLI]: {},
   [ChainId.MAINNET]: {},
   [ChainId.GWYNETH]: GWYNETH_TOKEN_MAP,
-  [ChainId.GWYNETH_L2A]: {},
-  [ChainId.GWYNETH_L2B]: {},
+  [ChainId.GWYNETH_L2A]: GWYNETH_L2A_TOKEN_MAP,
+  [ChainId.GWYNETH_L2B]: GWYNETH_L2B_TOKEN_MAP,
   [ChainId.SEPOLIA]: SEPOLIA_TOKEN_MAP
 }
 

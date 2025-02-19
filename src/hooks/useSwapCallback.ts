@@ -1,6 +1,6 @@
 import { BigNumber } from '@ethersproject/bignumber'
 import { Contract } from '@ethersproject/contracts'
-import { JSBI, Percent, Router, SwapParameters, Trade, TradeType } from '@uniswap/sdk'
+import { ETHER, currencyEquals, JSBI, Percent, Router, SwapParameters, Trade, TradeType } from '@uniswap/sdk'
 import { useMemo } from 'react'
 import { BIPS_BASE, DEFAULT_DEADLINE_FROM_NOW, INITIAL_ALLOWED_SLIPPAGE } from '../constants'
 import { getTradeVersion, useV1TradeExchangeAddress } from '../data/V1'
@@ -36,6 +36,29 @@ interface FailedCall {
 
 type EstimatedSwapCall = SuccessfulCall | FailedCall
 
+// Constants for cross-chain swap
+const UNISWAP_PORTAL_ADDRESS = '0x84FB3688D1ee5dCD0137746A07290f8bE55ec04E'
+const L2_CHAIN_IDS = {
+  L2A: 167010,
+  L2B: 167011
+}
+
+// Helper functions
+const isL2Chain = (chainId?: number): boolean => {
+  return chainId === L2_CHAIN_IDS.L2A || chainId === L2_CHAIN_IDS.L2B
+}
+
+const isTokenToTokenSwap = (trade: Trade | undefined): boolean => {
+  if (!trade) return false
+  return !currencyEquals(trade.inputAmount.currency, ETHER) && 
+         !currencyEquals(trade.outputAmount.currency, ETHER)
+}
+
+// Add Portal ABI
+const UNISWAP_PORTAL_ABI = [
+  'function swapExactTokensForTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)'
+]
+
 /**
  * Returns the swap calls that can be used to make the trade
  * @param trade trade to execute
@@ -59,6 +82,23 @@ function useSwapCallArguments(
   return useMemo(() => {
     const tradeVersion = getTradeVersion(trade)
     if (!trade || !recipient || !library || !account || !tradeVersion || !chainId) return []
+
+    // Handle L2 Portal case
+    if (isL2Chain(chainId) && isTokenToTokenSwap(trade)) {
+      const portalContract = new Contract(UNISWAP_PORTAL_ADDRESS, UNISWAP_PORTAL_ABI, library.getSigner(account))
+      
+      const swapParameters = Router.swapCallParameters(trade, {
+        feeOnTransfer: false,
+        allowedSlippage: new Percent(JSBI.BigInt(allowedSlippage), BIPS_BASE),
+        recipient,
+        ttl: deadline
+      })
+
+      return [{
+        parameters: swapParameters,
+        contract: portalContract
+      }]
+    }
 
     const contract: Contract | null =
       tradeVersion === Version.v2 ? getRouterContract(chainId, library, account) : v1Exchange
