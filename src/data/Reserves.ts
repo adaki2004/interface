@@ -15,7 +15,7 @@ import { wrappedCurrency } from '../utils/wrappedCurrency'
 
 const PAIR_INTERFACE = new Interface(IUniswapV2PairABI)
 
-const L1_RPC_URL = 'http://127.0.0.1:32002'
+const L1_RPC_URL = 'https://l1.rpc.gwyneth.xyz'
 const l1Provider = new JsonRpcProvider(L1_RPC_URL)
 
 export enum PairState {
