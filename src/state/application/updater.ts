@@ -40,9 +40,18 @@ export default function Updater(): null {
       .then(blockNumberCallback)
       .catch(error => console.error(`Failed to get block number for chainId: ${chainId}`, error))
 
-    library.on('block', blockNumberCallback)
-    return () => {
-      library.removeListener('block', blockNumberCallback)
+    try {
+      library.on('block', blockNumberCallback)
+      return () => {
+        try {
+          library.removeListener('block', blockNumberCallback)
+        } catch (error) {
+          console.debug('Error removing block listener:', error)
+        }
+      }
+    } catch (error) {
+      console.debug('Error setting up block listener:', error)
+      return undefined
     }
   }, [dispatch, chainId, library, blockNumberCallback, windowVisible])
 
