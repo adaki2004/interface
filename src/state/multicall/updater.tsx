@@ -30,12 +30,76 @@ async function fetchChunk(
   chunk: Call[],
   minBlockNumber: number
 ): Promise<{ results: string[]; blockNumber: number }> {
-  console.debug('Fetching chunk', multicallContract, chunk, minBlockNumber)
+  // Detailed logging of each call
+  const detailedCalls = chunk.map(call => {
+    const functionSig = call.callData.substring(0, 10)
+    
+    // Common function signatures to decode
+    const knownSigs: { [key: string]: string } = {
+      '0x70a08231': 'balanceOf(address)',
+      '0x18160ddd': 'totalSupply()',
+      '0x0902f1ac': 'getReserves()',
+      '0x06fdde03': 'name()',
+      '0x95d89b41': 'symbol()',
+      '0x313ce567': 'decimals()',
+      '0xdd62ed3e': 'allowance(address,address)',
+      '0x1f00ca74': 'getLastBlockHash()',
+      '0x252dba42': 'aggregate((address,bytes)[])'
+    }
+    
+    return {
+      address: call.address,
+      callData: call.callData,
+      functionSig: functionSig,
+      decodedFunction: knownSigs[functionSig] || 'unknown',
+      dataLength: call.callData.length
+    }
+  })
+
+  console.log('📞 MULTICALL CHUNK DETAILED:', {
+    multicallAddress: multicallContract.address,
+    chunkSize: chunk.length,
+    minBlockNumber,
+    calls: detailedCalls
+  })
+  
+  // Group calls by contract address for easier analysis
+  const callsByContract: { [address: string]: any[] } = {}
+  detailedCalls.forEach(call => {
+    if (!callsByContract[call.address]) {
+      callsByContract[call.address] = []
+    }
+    callsByContract[call.address].push({
+      function: call.decodedFunction,
+      sig: call.functionSig,
+      data: call.callData
+    })
+  })
+  
+  console.log('📊 CALLS GROUPED BY CONTRACT:', callsByContract)
+  
   let resultsBlockNumber, returnData
   try {
-    ;[resultsBlockNumber, returnData] = await multicallContract.aggregate(chunk.map(obj => [obj.address, obj.callData]))
+    const aggregateCall = chunk.map(obj => [obj.address, obj.callData])
+    console.log('🔄 Calling multicall.aggregate with:', {
+      aggregateCall: aggregateCall.slice(0, 3), // Show first 3 for brevity
+      totalCalls: aggregateCall.length
+    })
+    
+    ;[resultsBlockNumber, returnData] = await multicallContract.aggregate(aggregateCall)
+    
+    console.log('✅ MULTICALL SUCCESS:', {
+      blockNumber: resultsBlockNumber.toNumber(),
+      resultCount: returnData.length,
+      results: returnData.slice(0, 3).map((r: string) => `${r.substring(0, 20)}...`) // Show first 3 results truncated
+    })
   } catch (error) {
-    console.debug('Failed to fetch chunk inside retry', error)
+    console.error('❌ MULTICALL ERROR:', {
+      error: error?.message || error,
+      code: error?.code,
+      multicallAddress: multicallContract.address,
+      callCount: chunk.length
+    })
     throw error
   }
   if (resultsBlockNumber.toNumber() < minBlockNumber) {

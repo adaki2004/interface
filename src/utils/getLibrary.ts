@@ -4,6 +4,37 @@ export default function getLibrary(provider: any): Web3Provider {
   const library = new Web3Provider(provider, 'any') // 'any' allows network changes
   library.pollingInterval = 15000
   
+  // Intercept and log all RPC calls
+  const originalSend = library.send.bind(library)
+  library.send = function(method: string, params: any[]): Promise<any> {
+    console.log('🔍 RPC CALL:', {
+      method,
+      params,
+      chainId: library.network?.chainId,
+      timestamp: new Date().toISOString()
+    })
+    
+    return originalSend(method, params)
+      .then(result => {
+        console.log('✅ RPC RESPONSE:', {
+          method,
+          result: method === 'eth_call' ? `${JSON.stringify(result).substring(0, 100)}...` : result,
+          chainId: library.network?.chainId
+        })
+        return result
+      })
+      .catch(error => {
+        console.error('❌ RPC ERROR:', {
+          method,
+          params,
+          error: error.message,
+          code: error.code,
+          chainId: library.network?.chainId
+        })
+        throw error
+      })
+  }
+  
   // Handle network changes gracefully
   library.on('network', (newNetwork, oldNetwork) => {
     console.log('🌐 Network changed in Web3Provider:', { oldNetwork, newNetwork })
