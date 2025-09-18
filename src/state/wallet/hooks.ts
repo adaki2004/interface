@@ -1,11 +1,17 @@
 import { Currency, CurrencyAmount, ETHER, JSBI, Token, TokenAmount } from '@uniswap/sdk'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { Contract } from '@ethersproject/contracts'
+import { JsonRpcProvider } from '@ethersproject/providers'
 import ERC20_INTERFACE from '../../constants/abis/erc20'
 import { useAllTokens } from '../../hooks/Tokens'
 import { useActiveWeb3React } from '../../hooks'
 import { useMulticallContract } from '../../hooks/useContract'
 import { isAddress } from '../../utils'
 import { useSingleContractMultipleData, useMultipleContractSingleData } from '../multicall/hooks'
+import { isL2Chain } from '../../data/Reserves'
+
+const L1_RPC_URL = 'http://127.0.0.1:32002'
+const l1Provider = new JsonRpcProvider(L1_RPC_URL)
 
 /**
  * Returns a map of the given addresses to their eventually consistent ETH balances.
@@ -48,8 +54,13 @@ export function useETHBalances(
  */
 export function useTokenBalancesWithLoadingIndicator(
   address?: string,
-  tokens?: (Token | undefined)[]
+  tokens?: (Token | undefined)[],
+  options?: { forceL1?: boolean }
 ): [{ [tokenAddress: string]: TokenAmount | undefined }, boolean] {
+  const { chainId } = useActiveWeb3React()
+  const isL2 = isL2Chain(chainId)
+  const shouldUseL1 = options?.forceL1 && isL2
+  
   const validatedTokens: Token[] = useMemo(
     () => tokens?.filter((t?: Token): t is Token => isAddress(t?.address) !== false) ?? [],
     [tokens]
@@ -57,25 +68,100 @@ export function useTokenBalancesWithLoadingIndicator(
 
   const validatedTokenAddresses = useMemo(() => validatedTokens.map(vt => vt.address), [validatedTokens])
 
-  const balances = useMultipleContractSingleData(validatedTokenAddresses, ERC20_INTERFACE, 'balanceOf', [address])
+  // L1 fallback state for L2 chains
+  const [l1Balances, setL1Balances] = useState<{ [tokenAddress: string]: TokenAmount | undefined }>({})
+  const [l1Loading, setL1Loading] = useState(false)
 
-  const anyLoading: boolean = useMemo(() => balances.some(callState => callState.loading), [balances])
+  // L1 fallback when forceL1 is true on L2 chains
+  useEffect(() => {
+    if (!shouldUseL1 || !address || validatedTokens.length === 0) {
+      setL1Balances(prev => (Object.keys(prev).length ? {} : prev))
+      setL1Loading(false)
+      return
+    }
+
+    let isStale = false
+    setL1Loading(true)
+    
+    async function fetchL1Balances() {
+      try {
+        const balancePromises = validatedTokens.map(async (token) => {
+          try {
+            const contract = new Contract(token.address, ERC20_INTERFACE, l1Provider)
+            const balance = await contract.balanceOf(address)
+            return {
+              tokenAddress: token.address,
+              token,
+              balance: balance ? JSBI.BigInt(balance.toString()) : undefined
+            }
+          } catch (error) {
+            console.log(`L1 balance fetch failed for ${token.address}:`, error instanceof Error ? error.message : error)
+            return {
+              tokenAddress: token.address,
+              token,
+              balance: undefined
+            }
+          }
+        })
+
+        const results = await Promise.all(balancePromises)
+        
+        if (!isStale) {
+          const balancesMap = results.reduce<{ [tokenAddress: string]: TokenAmount | undefined }>((memo, { tokenAddress, token, balance }) => {
+            if (balance) {
+              memo[tokenAddress] = new TokenAmount(token, balance)
+            }
+            return memo
+          }, {})
+          
+          setL1Balances(balancesMap)
+          setL1Loading(false)
+        }
+      } catch (error) {
+        if (!isStale) {
+          console.error('Failed to fetch L1 token balances:', error)
+          setL1Balances({})
+          setL1Loading(false)
+        }
+      }
+    }
+
+    fetchL1Balances()
+    
+    return () => {
+      isStale = true
+    }
+  }, [shouldUseL1, address, validatedTokens])
+
+  // Use multicall unless we're forcing L1 on L2
+  const balances = useMultipleContractSingleData(
+    shouldUseL1 ? [] : validatedTokenAddresses, // Skip multicall when forcing L1
+    ERC20_INTERFACE, 
+    'balanceOf', 
+    [address]
+  )
+
+  const anyLoading: boolean = useMemo(() => {
+    return shouldUseL1 ? l1Loading : balances.some(callState => callState.loading)
+  }, [shouldUseL1, l1Loading, balances])
 
   return [
-    useMemo(
-      () =>
-        address && validatedTokens.length > 0
-          ? validatedTokens.reduce<{ [tokenAddress: string]: TokenAmount | undefined }>((memo, token, i) => {
-              const value = balances?.[i]?.result?.[0]
-              const amount = value ? JSBI.BigInt(value.toString()) : undefined
-              if (amount) {
-                memo[token.address] = new TokenAmount(token, amount)
-              }
-              return memo
-            }, {})
-          : {},
-      [address, validatedTokens, balances]
-    ),
+    useMemo(() => {
+      if (shouldUseL1) {
+        return l1Balances
+      }
+      
+      return address && validatedTokens.length > 0
+        ? validatedTokens.reduce<{ [tokenAddress: string]: TokenAmount | undefined }>((memo, token, i) => {
+            const value = balances?.[i]?.result?.[0]
+            const amount = value ? JSBI.BigInt(value.toString()) : undefined
+            if (amount) {
+              memo[token.address] = new TokenAmount(token, amount)
+            }
+            return memo
+          }, {})
+        : {}
+    }, [shouldUseL1, l1Balances, address, validatedTokens, balances]),
     anyLoading
   ]
 }

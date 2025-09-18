@@ -30,7 +30,7 @@ const L2_CHAIN_IDS = {
   L2B: 167011
 }
 
-const isL2Chain = (chainId?: number): boolean => {
+export const isL2Chain = (chainId?: number): boolean => {
   return chainId === L2_CHAIN_IDS.L2A || chainId === L2_CHAIN_IDS.L2B
 }
 
@@ -39,32 +39,69 @@ function useL1Reserves(pairAddresses: (string | undefined)[], shouldFetch: boole
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Stabilize the address array to prevent effect thrashing
+  const addressKey = useMemo(
+    () => pairAddresses.map(addr => addr?.toLowerCase() ?? '').join('|'),
+    [pairAddresses]
+  )
+  const addressesForFetch = useMemo(
+    () => addressKey.split('|').map(a => (a ? a : undefined)),
+    [addressKey]
+  )
+
   useEffect(() => {
-    if (!shouldFetch || !pairAddresses.length) return
+    if (!shouldFetch || !addressesForFetch.length) {
+      setReserves(prev => {
+        if (prev.length === addressesForFetch.length) return prev
+        return addressesForFetch.map(() => ({ result: undefined, loading: false }))
+      })
+      setLoading(prev => (prev ? false : prev))
+      return
+    }
+
+    let isStale = false
 
     async function fetchL1Reserves() {
       setLoading(true)
       try {
-        const validAddresses = pairAddresses.filter((addr): addr is string => !!addr)
-        const reservePromises = validAddresses.map(async (address) => {
-          const pair = new Contract(address, PAIR_INTERFACE, l1Provider)
-          return pair.getReserves()
+        const reservePromises = addressesForFetch.map(async (address) => {
+          if (!address) {
+            return { result: undefined, loading: false }
+          }
+          try {
+            const pair = new Contract(address, PAIR_INTERFACE, l1Provider)
+            const result = await pair.getReserves()
+            return { result, loading: false }
+          } catch (err) {
+            console.log(`L1 reserve fetch failed for ${address}:`, err instanceof Error ? err.message : err)
+            return { result: undefined, loading: false }
+          }
         })
 
         const results = await Promise.all(reservePromises)
-        setReserves(results.map(result => ({ result, loading: false })))
-        setError(null)
+        if (!isStale) {
+          setReserves(results)
+          setError(null)
+        }
       } catch (err) {
-        console.error('Failed to fetch L1 reserves:', err)
-        setError(err instanceof Error ? err.message : 'Failed to fetch L1 reserves')
-        setReserves([])
+        if (!isStale) {
+          console.error('Failed to fetch L1 reserves:', err)
+          setError(err instanceof Error ? err.message : 'Failed to fetch L1 reserves')
+          setReserves(addressesForFetch.map(() => ({ result: undefined, loading: false })))
+        }
       } finally {
-        setLoading(false)
+        if (!isStale) {
+          setLoading(false)
+        }
       }
     }
 
     fetchL1Reserves()
-  }, [pairAddresses, shouldFetch])
+    
+    return () => {
+      isStale = true
+    }
+  }, [shouldFetch, addressKey])
 
   return { reserves, loading, error }
 }
@@ -100,7 +137,7 @@ export function usePairs(currencies: [Currency | undefined, Currency | undefined
   const isL2 = isL2Chain(chainId)
   const { reserves: l1Reserves, loading: l1Loading } = useL1Reserves(pairAddresses, isL2)
   const l2Results = useMultipleContractSingleData(
-    pairAddresses,
+    isL2 ? [] : pairAddresses, // Skip multicall on L2 chains to prevent hanging
     PAIR_INTERFACE,
     'getReserves'
   )
