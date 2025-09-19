@@ -37,7 +37,7 @@ interface FailedCall {
 type EstimatedSwapCall = SuccessfulCall | FailedCall
 
 // Constants for cross-chain swap
-const UNISWAP_PORTAL_ADDRESS = '0x84FB3688D1ee5dCD0137746A07290f8bE55ec04E'
+const UNISWAP_PORTAL_ADDRESS = '0x2eC0cE30c885E67d27a3801297854B703047f17c'
 const L2_CHAIN_IDS = {
   L2A: 167010,
   L2B: 167011
@@ -196,6 +196,15 @@ export function useSwapCallback(
               .catch(gasError => {
                 console.debug('Gas estimate failed, trying eth_call to extract error', call)
 
+                // L2 early fallback: if gas estimation fails on L2, use fixed gas immediately
+                if (isL2Chain(chainId)) {
+                  console.log('Gas estimation failed on L2, using fixed gas limit for swap (early fallback)')
+                  return {
+                    call,
+                    gasEstimate: BigNumber.from('500000') // 500k gas should be sufficient for swaps
+                  }
+                }
+
                 return contract.callStatic[methodName](...args, options)
                   .then(result => {
                     console.debug('Unexpected successful call after failed estimate gas', call, gasError, result)
@@ -203,6 +212,16 @@ export function useSwapCallback(
                   })
                   .catch(callError => {
                     console.debug('Call threw error', call, callError)
+                    
+                    // L2 fallback: if both estimation and callStatic fail, use fixed gas limit
+                    if (isL2Chain(chainId)) {
+                      console.log('Both gas estimation and callStatic failed on L2, using fixed gas limit for swap')
+                      return {
+                        call,
+                        gasEstimate: BigNumber.from('500000') // 500k gas should be sufficient for swaps
+                      }
+                    }
+                    
                     let errorMessage: string
                     switch (callError.reason) {
                       case 'UniswapV2Router: INSUFFICIENT_OUTPUT_AMOUNT':

@@ -5,7 +5,8 @@ import {
   fetchingMulticallResults,
   removeMulticallListeners,
   toCallKey,
-  updateMulticallResults
+  updateMulticallResults,
+  invalidateMulticallResults
 } from './actions'
 
 export interface MulticallState {
@@ -106,6 +107,12 @@ export default createReducer(initialState, builder =>
           data: results[callKey],
           blockNumber
         }
+      })
+    })
+    .addCase(invalidateMulticallResults, (state, { payload: { chainId, callKeys } }) => {
+      if (!state.callResults[chainId]) return
+      callKeys.forEach(callKey => {
+        delete state.callResults[chainId][callKey]
       })
     })
 )
