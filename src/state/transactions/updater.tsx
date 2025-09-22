@@ -115,7 +115,7 @@ export default function Updater(): null {
                     createBalanceOfCallKey(tokenAddress, account)
                   )
                   
-                  console.log('🗑️ Invalidating multicall cache for successful transaction:', {
+                  console.log('Invalidating multicall cache for successful transaction:', {
                     hash,
                     summary: tx?.summary,
                     affectedTokens,
