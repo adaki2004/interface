@@ -16,14 +16,14 @@ import { ButtonPrimary, ButtonSecondary } from '../../components/Button'
 import { AutoColumn } from '../../components/Column'
 
 import { useActiveWeb3React } from '../../hooks'
-import { usePairs } from '../../data/Reserves'
+import { usePairs, isL2Chain } from '../../data/Reserves'
 import { toV2LiquidityToken, useTrackedTokenPairs } from '../../state/user/hooks'
 import AppBody from '../AppBody'
 import { Dots } from '../../components/swap/styleds'
 
 export default function Pool() {
   const theme = useContext(ThemeContext)
-  const { account } = useActiveWeb3React()
+  const { account, chainId } = useActiveWeb3React()
 
   // fetch the user's balances of all tracked V2 LP tokens
   const trackedTokenPairs = useTrackedTokenPairs()
@@ -36,7 +36,8 @@ export default function Pool() {
   ])
   const [v2PairsBalances, fetchingV2PairBalances] = useTokenBalancesWithLoadingIndicator(
     account ?? undefined,
-    liquidityTokens
+    liquidityTokens,
+    { forceL1: true } // LP tokens only exist on L1
   )
 
   // fetch the reserves for all V2 pools in which the user has a balance
@@ -74,6 +75,11 @@ export default function Pool() {
               </Text>
               <Question text="When you add liquidity, you are given pool tokens that represent your share. If you don’t see a pool you joined in this list, try importing a pool below." />
             </RowBetween>
+            {isL2Chain(chainId) && (
+              <Text fontSize={12} color={theme.text3} textAlign="center" style={{ marginTop: '4px' }}>
+                Pools sourced from L1 (balances reflect your L2 wallet)
+              </Text>
+            )}
 
             {!account ? (
               <LightCard padding="40px">

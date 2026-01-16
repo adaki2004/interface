@@ -1,4 +1,5 @@
 import { MaxUint256 } from '@ethersproject/constants'
+import { BigNumber } from '@ethersproject/bignumber'
 import { TransactionResponse } from '@ethersproject/providers'
 import { Trade, TokenAmount, CurrencyAmount, ETHER, currencyEquals } from '@uniswap/sdk'
 import { useCallback, useMemo } from 'react'
@@ -21,7 +22,7 @@ export enum ApprovalState {
 }
 
 // First add the constants at the top
-const UNISWAP_PORTAL_ADDRESS = '0x84FB3688D1ee5dCD0137746A07290f8bE55ec04E'
+const UNISWAP_PORTAL_ADDRESS = '0x2eC0cE30c885E67d27a3801297854B703047f17c'
 const L2_CHAIN_IDS = {
   L2A: 167010,
   L2B: 167011
@@ -97,6 +98,10 @@ export function useApproveCallback(
       // general fallback for tokens who restrict approval amounts
       useExact = true
       return tokenContract.estimateGas.approve(spender, amountToApprove.raw.toString())
+    }).catch(() => {
+      // L2 fallback: use fixed gas limit if estimation fails (common on L2 chains)
+      console.log('Gas estimation failed, using fixed gas limit for approve')
+      return BigNumber.from('100000') // 100k gas should be sufficient for approve
     })
 
     return tokenContract

@@ -31,7 +31,7 @@ export type TokenAddressMap = Readonly<{ [chainId in ChainId]: Readonly<{ [token
 const GWYNETH_TOKENS: TokenInfo[] = [
   {
   chainId: ChainId.GWYNETH,
-  address: '0xA12297e9F5B9E9Ca7A810725904aFAf13a1eD568',
+  address: '0xDE68f4ED350A914c2d9279d4bc38A4549A41c5d1',
   name: 'Sloth Token',
   decimals: 18,
   symbol: 'SLOTH',
@@ -40,7 +40,7 @@ const GWYNETH_TOKENS: TokenInfo[] = [
 },
   {
     chainId: ChainId.GWYNETH,
-    address: '0x534Cf76B8D56ab71caC1c211c9B38C81cA8E4B45',
+    address: '0x497664eD3164Ff894CEdDB28C24C181e830C621f',
     name: 'Taiko Token',
     decimals: 18,
     symbol: 'TAIKO',
@@ -49,7 +49,7 @@ const GWYNETH_TOKENS: TokenInfo[] = [
   },
   {
     chainId: ChainId.GWYNETH,
-    address: '0x6B2345898C657861F13C6408b73c82bb39784ec2',
+    address: '0xe7a62ae99A4AFf6d389233720352e3379F2Be251',
     name: 'Cheese Token',
     decimals: 18,
     symbol: 'CHEESE',
@@ -58,7 +58,7 @@ const GWYNETH_TOKENS: TokenInfo[] = [
   },
   {
     chainId: ChainId.GWYNETH,
-    address: '0x0a01EF051EfEeEEBE01A333F7323547494f30817',
+    address: '0x12BEFBCED4fCC6c2b854d34c7e0906F50143EDff',
     name: 'Wrapped Ether',
     decimals: 18,
     symbol: 'WETH',
@@ -70,7 +70,7 @@ const GWYNETH_TOKENS: TokenInfo[] = [
 const GWYNETH_L2A_TOKENS: TokenInfo[] = [
   {
   chainId: ChainId.GWYNETH_L2A,
-  address: '0xA12297e9F5B9E9Ca7A810725904aFAf13a1eD568',
+  address: '0xDE68f4ED350A914c2d9279d4bc38A4549A41c5d1',
   name: 'Sloth Token',
   decimals: 18,
   symbol: 'SLOTH',
@@ -79,7 +79,7 @@ const GWYNETH_L2A_TOKENS: TokenInfo[] = [
 },
   {
     chainId: ChainId.GWYNETH_L2A,
-    address: '0x534Cf76B8D56ab71caC1c211c9B38C81cA8E4B45',
+    address: '0x497664eD3164Ff894CEdDB28C24C181e830C621f',
     name: 'Taiko Token',
     decimals: 18,
     symbol: 'TAIKO',
@@ -88,7 +88,7 @@ const GWYNETH_L2A_TOKENS: TokenInfo[] = [
   },
   {
     chainId: ChainId.GWYNETH_L2A,
-    address: '0x6B2345898C657861F13C6408b73c82bb39784ec2',
+    address: '0xe7a62ae99A4AFf6d389233720352e3379F2Be251',
     name: 'Cheese Token',
     decimals: 18,
     symbol: 'CHEESE',
@@ -97,7 +97,7 @@ const GWYNETH_L2A_TOKENS: TokenInfo[] = [
   },
   {
     chainId: ChainId.GWYNETH_L2A,
-    address: '0x0a01EF051EfEeEEBE01A333F7323547494f30817',
+    address: '0x12BEFBCED4fCC6c2b854d34c7e0906F50143EDff',
     name: 'Wrapped Ether',
     decimals: 18,
     symbol: 'WETH',
@@ -123,7 +123,7 @@ const SEPOLIA_TOKENS: TokenInfo[] = [
 const GWYNETH_L2B_TOKENS: TokenInfo[] = [
   {
   chainId: ChainId.GWYNETH_L2B,
-  address: '0xA12297e9F5B9E9Ca7A810725904aFAf13a1eD568',
+  address: '0xDE68f4ED350A914c2d9279d4bc38A4549A41c5d1',
   name: 'Sloth Token',
   decimals: 18,
   symbol: 'SLOTH',
@@ -132,7 +132,7 @@ const GWYNETH_L2B_TOKENS: TokenInfo[] = [
 },
   {
     chainId: ChainId.GWYNETH_L2B,
-    address: '0x534Cf76B8D56ab71caC1c211c9B38C81cA8E4B45',
+    address: '0x497664eD3164Ff894CEdDB28C24C181e830C621f',
     name: 'Taiko Token',
     decimals: 18,
     symbol: 'TAIKO',
@@ -141,7 +141,7 @@ const GWYNETH_L2B_TOKENS: TokenInfo[] = [
   },
   {
     chainId: ChainId.GWYNETH_L2B,
-    address: '0x6B2345898C657861F13C6408b73c82bb39784ec2',
+    address: '0xe7a62ae99A4AFf6d389233720352e3379F2Be251',
     name: 'Cheese Token',
     decimals: 18,
     symbol: 'CHEESE',
@@ -150,7 +150,7 @@ const GWYNETH_L2B_TOKENS: TokenInfo[] = [
   },
   {
     chainId: ChainId.GWYNETH_L2B,
-    address: '0x0a01EF051EfEeEEBE01A333F7323547494f30817',
+    address: '0x12BEFBCED4fCC6c2b854d34c7e0906F50143EDff',
     name: 'Wrapped Ether',
     decimals: 18,
     symbol: 'WETH',
@@ -192,7 +192,8 @@ const EMPTY_LIST: TokenAddressMap = {
   [ChainId.GWYNETH]: GWYNETH_TOKEN_MAP,
   [ChainId.GWYNETH_L2A]: GWYNETH_L2A_TOKEN_MAP,
   [ChainId.GWYNETH_L2B]: GWYNETH_L2B_TOKEN_MAP,
-  [ChainId.SEPOLIA]: SEPOLIA_TOKEN_MAP
+  [ChainId.SEPOLIA]: SEPOLIA_TOKEN_MAP,
+  [ChainId.HOODI]: {}
 }
 
 const listCache: WeakMap<TokenList, TokenAddressMap> | null =

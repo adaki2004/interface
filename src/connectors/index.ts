@@ -30,6 +30,38 @@ export const injected = new InjectedConnector({
   supportedChainIds: [1, 3, 4, 5, 42, 160010, 167010, 167011, 11155111]
 })
 
+// Some providers (notably when rapidly switching custom networks) temporarily
+// emit `null` for chainId/networkId. Those values blow up inside web3-react's
+// normalizeChainId helper. Patch the connector to ignore such transient
+// updates instead of crashing the app. This keeps the UI responsive while the
+// provider finishes switching networks.
+const injectedAny = injected as unknown as {
+  handleChainChanged?: (chainId: string | number | null | undefined) => void
+  handleNetworkChanged?: (networkId: string | number | null | undefined) => void
+}
+
+if (injectedAny.handleChainChanged) {
+  const original = injectedAny.handleChainChanged.bind(injectedAny)
+  injectedAny.handleChainChanged = (chainId: string | number | null | undefined) => {
+    if (chainId === null || chainId === undefined) {
+      console.warn('Injected connector received null chainId; ignoring update until provider resolves')
+      return
+    }
+    original(chainId)
+  }
+}
+
+if (injectedAny.handleNetworkChanged) {
+  const original = injectedAny.handleNetworkChanged.bind(injectedAny)
+  injectedAny.handleNetworkChanged = (networkId: string | number | null | undefined) => {
+    if (networkId === null || networkId === undefined) {
+      console.warn('Injected connector received null networkId; ignoring update until provider resolves')
+      return
+    }
+    original(networkId)
+  }
+}
+
 // mainnet only
 export const walletconnect = new WalletConnectConnector({
   rpc: { 1: NETWORK_URL },
